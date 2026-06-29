@@ -6,6 +6,9 @@
 #include "Buzzer.h"
 #include "Mpu6050Sensor.h"
 #include "RainSensor.h"
+#include "config.h"
+#include <WiFi.h>
+#include <HTTPClient.h>
 
 class SentinellaDevice : public Device {
 private:
@@ -18,8 +21,10 @@ private:
     int tiltSeverity;  // 0 = normal, 1 = critical
     int rainSeverity;  // 0 = normal, 1 = critical
     bool lastCritical;
+    bool wifiConnected;
 
     void evaluateGlobalState();
+    void postReading(bool critical);
 
 public:
     static const int PIN_TILT_SDA  = 21;

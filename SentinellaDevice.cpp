@@ -7,10 +7,27 @@ SentinellaDevice::SentinellaDevice()
       redLed(PIN_LED_RED, false, this),
       greenLed(PIN_LED_GREEN, true, this),
       buzzer(PIN_BUZZER, this),
-      tiltSeverity(0), rainSeverity(0), lastCritical(false) {}
+      tiltSeverity(0), rainSeverity(0), lastCritical(false), wifiConnected(false) {}
 
 void SentinellaDevice::begin() {
     Serial.println("\n=== Sentinella Edge Node - Tailing Dam Monitor ===");
+
+    Serial.printf("[WIFI]  Conectando a %s", WIFI_SSID);
+    WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+    int attempts = 0;
+    while (WiFi.status() != WL_CONNECTED && attempts < 20) {
+        delay(500);
+        Serial.print(".");
+        attempts++;
+    }
+    if (WiFi.status() == WL_CONNECTED) {
+        wifiConnected = true;
+        Serial.printf("\n[WIFI]  Conectado — IP: %s\n", WiFi.localIP().toString().c_str());
+    } else {
+        wifiConnected = false;
+        Serial.println("\n[WIFI]  Sin conexión — modo offline.");
+    }
+
     if (!tiltSensor.begin()) {
         Serial.println("[ERROR] MPU6050 no encontrado — revisa SDA/SCL.");
         while (true) delay(10);
@@ -48,6 +65,7 @@ void SentinellaDevice::evaluateGlobalState() {
         const char* label = critical ? "[CRITICAL]" : "[NORMAL]  ";
         Serial.printf("%s  Tilt: %6.2f°  |  Rain ADC: %4d / 4095  (%.1f%%)\n",
                       label, getLatestTilt(), getLatestRainADC(), getLatestRainADC() / 40.95f);
+        postReading(critical);
     }
 }
 
@@ -56,4 +74,32 @@ void SentinellaDevice::update() {
     rainSensor.update();
     buzzer.update();
     evaluateGlobalState();
+}
+
+void SentinellaDevice::postReading(bool critical) {
+    if (!wifiConnected || WiFi.status() != WL_CONNECTED) {
+        Serial.println("[HTTP]  Sin WiFi — lectura no enviada.");
+        return;
+    }
+
+    HTTPClient http;
+    http.begin(EDGE_URL);
+    http.addHeader("Content-Type", "application/json");
+    http.addHeader("X-API-Key", EDGE_API_KEY);
+
+    String payload = "{";
+    payload += "\"device_id\":\"" DEVICE_ID "\",";
+    payload += "\"tilt_deg\":" + String(getLatestTilt(), 2) + ",";
+    payload += "\"rain_adc\":" + String(getLatestRainADC()) + ",";
+    payload += "\"rain_pct\":" + String(getLatestRainADC() / 40.95f, 1) + ",";
+    payload += "\"status\":\"" + String(critical ? "CRITICAL" : "NORMAL") + "\"";
+    payload += "}";
+
+    int code = http.POST(payload);
+    if (code > 0) {
+        Serial.printf("[HTTP]  POST enviado → %d\n", code);
+    } else {
+        Serial.printf("[HTTP]  Error: %s\n", http.errorToString(code).c_str());
+    }
+    http.end();
 }
