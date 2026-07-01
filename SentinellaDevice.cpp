@@ -3,7 +3,7 @@
 
 SentinellaDevice::SentinellaDevice()
     : tiltSensor(PIN_TILT_SDA, this),
-      rainSensor(PIN_RAIN, this),
+      rainSensor(PIN_RAIN, PIN_RAIN_DO, this),
       redLed(PIN_LED_RED, false, this),
       greenLed(PIN_LED_GREEN, true, this),
       buzzer(PIN_BUZZER, this),
@@ -63,8 +63,9 @@ void SentinellaDevice::evaluateGlobalState() {
     if (critical != lastCritical) {
         lastCritical = critical;
         const char* label = critical ? "[CRITICAL]" : "[NORMAL]  ";
-        Serial.printf("%s  Tilt: %6.2f°  |  Rain ADC: %4d / 4095  (%.1f%%)\n",
-                      label, getLatestTilt(), getLatestRainADC(), getLatestRainADC() / 40.95f);
+        Serial.printf("%s  Tilt: %6.2f°  |  Rain AO: %4d / 4095  (%.1f%%)  DO:%s\n",
+                      label, getLatestTilt(), getLatestRainADC(), getLatestRainPct(),
+                      rainSensor.isRainingDigital() ? "LLUVIA" : "seco");
         postReading(critical);
     }
 }
@@ -83,6 +84,11 @@ void SentinellaDevice::postReading(bool critical) {
     }
 
     HTTPClient http;
+    // Timeouts cortos: si el edge no responde, el POST regresa rápido y no
+    // congela el loop (sensores/serial/buzzer siguen corriendo).
+    http.setConnectTimeout(1500); // ms para establecer la conexión TCP
+    http.setTimeout(1500);        // ms para la respuesta HTTP
+    http.setReuse(false);
     http.begin(EDGE_URL);
     http.addHeader("Content-Type", "application/json");
     http.addHeader("X-API-Key", EDGE_API_KEY);
@@ -91,7 +97,7 @@ void SentinellaDevice::postReading(bool critical) {
     payload += "\"device_id\":\"" DEVICE_ID "\",";
     payload += "\"tilt_deg\":" + String(getLatestTilt(), 2) + ",";
     payload += "\"rain_adc\":" + String(getLatestRainADC()) + ",";
-    payload += "\"rain_pct\":" + String(getLatestRainADC() / 40.95f, 1) + ",";
+    payload += "\"rain_pct\":" + String(getLatestRainPct(), 1) + ",";
     payload += "\"status\":\"" + String(critical ? "CRITICAL" : "NORMAL") + "\"";
     payload += "}";
 

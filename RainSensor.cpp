@@ -4,9 +4,13 @@
 const Event RainSensor::RAIN_NORMAL_EVENT = Event(RAIN_NORMAL_EVENT_ID);
 const Event RainSensor::RAIN_CRITICAL_EVENT = Event(RAIN_CRITICAL_EVENT_ID);
 
-RainSensor::RainSensor(int pin, EventHandler* eventHandler)
-    : Sensor(pin, eventHandler), lastReadTime(0), lastADC(0), currentState(0) {
-    pinMode(pin, INPUT);
+RainSensor::RainSensor(int aoPin, int doPin, EventHandler* eventHandler)
+    : Sensor(aoPin, eventHandler), lastReadTime(0), lastAO(4095), lastRainPct(0.0f),
+      doPin(doPin), lastRaining(false), currentState(0) {
+    pinMode(aoPin, INPUT);
+    if (doPin >= 0) {
+        pinMode(doPin, INPUT);
+    }
 }
 
 void RainSensor::update() {
@@ -14,8 +18,18 @@ void RainSensor::update() {
     if (now - lastReadTime >= 500) {
         lastReadTime = now;
 
-        lastADC = analogRead(pin);
-        int newState = (lastADC > RAIN_THRESHOLD) ? 1 : 0;
+        // FC-37: AO invertido — seco≈4095, mojado≈0. El % de lluvia es el complemento.
+        lastAO = analogRead(pin);
+        lastRainPct = (4095 - lastAO) / 40.95f;
+        if (lastRainPct < 0.0f)   lastRainPct = 0.0f;
+        if (lastRainPct > 100.0f) lastRainPct = 100.0f;
+
+        // DO activo-bajo: LOW = lluvia detectada por el comparador del módulo.
+        if (doPin >= 0) {
+            lastRaining = (digitalRead(doPin) == LOW);
+        }
+
+        int newState = (lastRainPct > RAIN_CRITICAL_PCT) ? 1 : 0;
 
         if (newState != currentState && handler != nullptr) {
             currentState = newState;

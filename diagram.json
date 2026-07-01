@@ -20,8 +20,8 @@
       "attrs": {}
     },
     {
-      "type": "wokwi-potentiometer",
-      "id": "pot1",
+      "type": "chip-fc37",
+      "id": "fc37",
       "top": -244,
       "left": 425.3,
       "attrs": {}
@@ -76,9 +76,10 @@
     [ "esp:21",    "imu1:SDA", "green", [] ],
     [ "esp:22",    "imu1:SCL", "blue",  [] ],
 
-    [ "bb1:tp.10", "pot1:VCC", "red",    [] ],
-    [ "bb1:tn.10", "pot1:GND", "black",  [] ],
-    [ "esp:34",    "pot1:SIG", "orange", [] ],
+    [ "bb1:tp.10", "fc37:VCC", "red",    [] ],
+    [ "bb1:tn.10", "fc37:GND", "black",  [] ],
+    [ "esp:34",    "fc37:AO",  "orange", [] ],
+    [ "esp:35",    "fc37:DO",  "yellow", [] ],
 
     [ "bb1:tn.32", "bb1:40t.a", "black", [ "v0" ] ],
     [ "bb1:41b.f", "bb1:41t.d", "red",   [ "v0" ] ],
