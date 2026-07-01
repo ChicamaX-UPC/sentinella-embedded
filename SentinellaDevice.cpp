@@ -1,5 +1,6 @@
 #include "SentinellaDevice.h"
 #include <Arduino.h>
+#include <WiFiClientSecure.h>
 
 SentinellaDevice::SentinellaDevice()
     : tiltSensor(PIN_TILT_SDA, this),
@@ -98,14 +99,25 @@ void SentinellaDevice::postReading(bool critical) {
     }
 
     HTTPClient http;
-    // Timeouts cortos: si el edge no responde, el POST regresa rápido y no
-    // congela el loop (sensores/serial/buzzer siguen corriendo).
-    http.setConnectTimeout(1500); // ms para establecer la conexión TCP
-    http.setTimeout(1500);        // ms para la respuesta HTTP
+    // Timeouts acotados: si el edge/túnel no responde, el POST regresa rápido y
+    // no congela el loop (sensores/serial/buzzer siguen corriendo).
+    http.setConnectTimeout(10000); // ms — el handshake TLS en Wokwi es lento
+    http.setTimeout(10000);        // ms para la respuesta HTTP
     http.setReuse(false);
-    http.begin(EDGE_URL);
+
+    // Detección de esquema: http:// (edge LAN) o https:// (túnel público, p. ej.
+    // ngrok/cloudflared). En TLS no validamos el certificado (setInsecure) porque
+    // el dispositivo simulado no lleva CA store.
+    WiFiClientSecure secureClient;
+    if (String(EDGE_URL).startsWith("https")) {
+        secureClient.setInsecure();
+        http.begin(secureClient, EDGE_URL);
+    } else {
+        http.begin(EDGE_URL);
+    }
     http.addHeader("Content-Type", "application/json");
     http.addHeader("X-API-Key", EDGE_API_KEY);
+    http.addHeader("ngrok-skip-browser-warning", "true"); // inofensivo si no usas ngrok
 
     String payload = "{";
     payload += "\"device_id\":\"" DEVICE_ID "\",";
