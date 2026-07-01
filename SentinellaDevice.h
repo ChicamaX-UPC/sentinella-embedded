@@ -28,7 +28,8 @@ private:
 
 public:
     static const int PIN_TILT_SDA  = 21;
-    static const int PIN_RAIN      = 34;
+    static const int PIN_RAIN      = 34;  // FC-37 AO (salida analógica)
+    static const int PIN_RAIN_DO   = 35;  // FC-37 DO (salida digital, activo-bajo)
     static const int PIN_LED_RED   = 18;
     static const int PIN_LED_GREEN = 19;
     static const int PIN_BUZZER    = 5;
@@ -43,6 +44,7 @@ public:
 
     float getLatestTilt()    const { return tiltSensor.getLatestTiltDeg(); }
     int   getLatestRainADC() const { return rainSensor.getLatestADC(); }
+    float getLatestRainPct() const { return rainSensor.getLatestRainPct(); }
 };
 
 #endif // SENTINELLA_DEVICE_H
