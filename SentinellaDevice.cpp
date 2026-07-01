@@ -68,6 +68,20 @@ void SentinellaDevice::evaluateGlobalState() {
                       rainSensor.isRainingDigital() ? "LLUVIA" : "seco");
         postReading(critical);
     }
+
+    // Latido de mediciones: imprime el estado vivo cada 2 s aunque no haya
+    // transición global, para confirmar que los sensores se están leyendo.
+    static unsigned long lastHeartbeat = 0;
+    unsigned long now = millis();
+    if (now - lastHeartbeat >= 2000) {
+        lastHeartbeat = now;
+        Serial.printf("[MEAS]  Tilt: %6.2f° (%s)  |  Rain: %5.1f%% (AO:%4d DO:%s %s)  |  Global: %s\n",
+                      getLatestTilt(), tiltSeverity ? "CRIT" : "ok",
+                      getLatestRainPct(), getLatestRainADC(),
+                      rainSensor.isRainingDigital() ? "LLUVIA" : "seco",
+                      rainSeverity ? "CRIT" : "ok",
+                      lastCritical ? "CRITICAL" : "NORMAL");
+    }
 }
 
 void SentinellaDevice::update() {
