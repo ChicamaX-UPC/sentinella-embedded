@@ -84,6 +84,11 @@ void SentinellaDevice::postReading(bool critical) {
     }
 
     HTTPClient http;
+    // Timeouts cortos: si el edge no responde, el POST regresa rápido y no
+    // congela el loop (sensores/serial/buzzer siguen corriendo).
+    http.setConnectTimeout(1500); // ms para establecer la conexión TCP
+    http.setTimeout(1500);        // ms para la respuesta HTTP
+    http.setReuse(false);
     http.begin(EDGE_URL);
     http.addHeader("Content-Type", "application/json");
     http.addHeader("X-API-Key", EDGE_API_KEY);
