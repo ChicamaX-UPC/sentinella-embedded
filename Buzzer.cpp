@@ -33,6 +33,9 @@ static const int NUM_NOTES = sizeof(melody) / sizeof(melody[0]);
 
 Buzzer::Buzzer(int pin, CommandHandler* commandHandler)
     : Actuator(pin, commandHandler), isPlaying(false), noteStartTime(0), currentNote(0) {
+}
+
+void Buzzer::begin() {
     pinMode(pin, OUTPUT);
     noTone(pin);
 }

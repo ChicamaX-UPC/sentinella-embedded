@@ -4,14 +4,24 @@
 
 SentinellaDevice::SentinellaDevice()
     : tiltSensor(PIN_TILT_SDA, this),
-      rainSensor(PIN_RAIN, PIN_RAIN_DO, this),
-      redLed(PIN_LED_RED, false, this),
-      greenLed(PIN_LED_GREEN, true, this),
-      buzzer(PIN_BUZZER, this),
+      rainSensor(PIN_RAIN, -1, this), // sin DO: solo A0 conectado (GND, A0, VCC)
       tiltSeverity(0), rainSeverity(0), lastCritical(false), wifiConnected(false) {}
 
 void SentinellaDevice::begin() {
     Serial.println("\n=== Sentinella Edge Node - Tailing Dam Monitor ===");
+
+    // MPU6050 primero y en aislamiento (igual que el sketch de prueba que funciona):
+    // antes de tocar cualquier otro pin/periférico o de arrancar el WiFi, para
+    // descartar cualquier interferencia de timing en el bus I2C.
+    if (!tiltSensor.begin()) {
+        while (true) {
+            Serial.println("[ERROR] MPU6050 no encontrado — revisa SDA/SCL.");
+            delay(1000);
+        }
+    }
+    Serial.printf("[INFO]  MPU6050 inicializado — linea base: %.2f°\n", tiltSensor.getBaselineTiltDeg());
+
+    rainSensor.begin();
 
     Serial.printf("[WIFI]  Conectando a %s", WIFI_SSID);
     WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
@@ -29,11 +39,6 @@ void SentinellaDevice::begin() {
         Serial.println("\n[WIFI]  Sin conexión — modo offline.");
     }
 
-    if (!tiltSensor.begin()) {
-        Serial.println("[ERROR] MPU6050 no encontrado — revisa SDA/SCL.");
-        while (true) delay(10);
-    }
-    Serial.println("[INFO]  MPU6050 inicializado.");
     Serial.println("[INFO]  Polling cada 500 ms — sin delay().\n");
 }
 
@@ -49,37 +54,23 @@ void SentinellaDevice::handle(Command command) {
 }
 
 void SentinellaDevice::evaluateGlobalState() {
-    bool critical = (tiltSeverity == 1) && (rainSeverity == 1);
-
-    if (critical) {
-        redLed.handle(Led::TURN_ON_COMMAND);
-        greenLed.handle(Led::TURN_OFF_COMMAND);
-        buzzer.handle(Buzzer::PLAY_ALARM_COMMAND);
-    } else {
-        redLed.handle(Led::TURN_OFF_COMMAND);
-        greenLed.handle(Led::TURN_ON_COMMAND);
-        buzzer.handle(Buzzer::STOP_ALARM_COMMAND);
-    }
+    bool critical = (tiltSeverity == 1) || (rainSeverity == 1);
 
     if (critical != lastCritical) {
         lastCritical = critical;
         const char* label = critical ? "[CRITICAL]" : "[NORMAL]  ";
-        Serial.printf("%s  Tilt: %6.2f°  |  Rain AO: %4d / 4095  (%.1f%%)  DO:%s\n",
-                      label, getLatestTilt(), getLatestRainADC(), getLatestRainPct(),
-                      rainSensor.isRainingDigital() ? "LLUVIA" : "seco");
+        Serial.printf("%s  Tilt: %6.2f°  |  Rain AO: %4d / 4095  (%.1f%%)\n",
+                      label, getLatestTilt(), getLatestRainADC(), getLatestRainPct());
         postReading(critical);
     }
 
-    // Latido de mediciones: imprime el estado vivo cada 2 s aunque no haya
-    // transición global, para confirmar que los sensores se están leyendo.
     static unsigned long lastHeartbeat = 0;
     unsigned long now = millis();
     if (now - lastHeartbeat >= 2000) {
         lastHeartbeat = now;
-        Serial.printf("[MEAS]  Tilt: %6.2f° (%s)  |  Rain: %5.1f%% (AO:%4d DO:%s %s)  |  Global: %s\n",
+        Serial.printf("[MEAS]  Tilt: %6.2f° (%s)  |  Rain: %5.1f%% (AO:%4d %s)  |  Global: %s\n",
                       getLatestTilt(), tiltSeverity ? "CRIT" : "ok",
                       getLatestRainPct(), getLatestRainADC(),
-                      rainSensor.isRainingDigital() ? "LLUVIA" : "seco",
                       rainSeverity ? "CRIT" : "ok",
                       lastCritical ? "CRITICAL" : "NORMAL");
     }
@@ -88,7 +79,6 @@ void SentinellaDevice::evaluateGlobalState() {
 void SentinellaDevice::update() {
     tiltSensor.update();
     rainSensor.update();
-    buzzer.update();
     evaluateGlobalState();
 }
 
@@ -99,15 +89,10 @@ void SentinellaDevice::postReading(bool critical) {
     }
 
     HTTPClient http;
-    // Timeouts acotados: si el edge/túnel no responde, el POST regresa rápido y
-    // no congela el loop (sensores/serial/buzzer siguen corriendo).
-    http.setConnectTimeout(10000); // ms — el handshake TLS en Wokwi es lento
-    http.setTimeout(10000);        // ms para la respuesta HTTP
+    http.setConnectTimeout(10000);
+    http.setTimeout(10000);
     http.setReuse(false);
 
-    // Detección de esquema: http:// (edge LAN) o https:// (túnel público, p. ej.
-    // ngrok/cloudflared). En TLS no validamos el certificado (setInsecure) porque
-    // el dispositivo simulado no lleva CA store.
     WiFiClientSecure secureClient;
     if (String(EDGE_URL).startsWith("https")) {
         secureClient.setInsecure();
@@ -117,7 +102,7 @@ void SentinellaDevice::postReading(bool critical) {
     }
     http.addHeader("Content-Type", "application/json");
     http.addHeader("X-API-Key", EDGE_API_KEY);
-    http.addHeader("ngrok-skip-browser-warning", "true"); // inofensivo si no usas ngrok
+    http.addHeader("ngrok-skip-browser-warning", "true");
 
     String payload = "{";
     payload += "\"device_id\":\"" DEVICE_ID "\",";

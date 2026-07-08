@@ -17,8 +17,10 @@ public:
 
     Buzzer(int pin, CommandHandler* commandHandler = nullptr);
 
-    void handle(Command command) override;
+    /// Configura el pin como salida. Llamar desde setup()/begin(), no desde el constructor.
+    void begin();
 
+    void handle(Command command) override;
     void update();
 };
 

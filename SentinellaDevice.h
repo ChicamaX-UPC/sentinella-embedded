@@ -2,8 +2,6 @@
 #define SENTINELLA_DEVICE_H
 
 #include "Device.h"
-#include "Led.h"
-#include "Buzzer.h"
 #include "Mpu6050Sensor.h"
 #include "RainSensor.h"
 #include "config.h"
@@ -14,9 +12,6 @@ class SentinellaDevice : public Device {
 private:
     Mpu6050Sensor tiltSensor;
     RainSensor rainSensor;
-    Led redLed;
-    Led greenLed;
-    Buzzer buzzer;
 
     int tiltSeverity;  // 0 = normal, 1 = critical
     int rainSeverity;  // 0 = normal, 1 = critical
@@ -28,11 +23,7 @@ private:
 
 public:
     static const int PIN_TILT_SDA  = 21;
-    static const int PIN_RAIN      = 34;  // FC-37 AO (salida analógica)
-    static const int PIN_RAIN_DO   = 35;  // FC-37 DO (salida digital, activo-bajo)
-    static const int PIN_LED_RED   = 18;
-    static const int PIN_LED_GREEN = 19;
-    static const int PIN_BUZZER    = 5;
+    static const int PIN_RAIN      = 32;  // FC-37 AO (salida analógica)
 
     SentinellaDevice();
 

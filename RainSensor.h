@@ -14,10 +14,10 @@
 class RainSensor : public Sensor {
 private:
     unsigned long lastReadTime;
-    int   lastAO;        ///< Lectura cruda de AO (0-4095): seco≈4095, mojado≈0.
-    float lastRainPct;   ///< Porcentaje de lluvia (0-100), derivado de AO invertido.
-    int   doPin;         ///< Pin de la salida digital DO (-1 si no se cablea).
-    bool  lastRaining;   ///< Estado de DO (true = lluvia detectada, DO en LOW).
+    int   lastAO;
+    float lastRainPct;
+    int   doPin;
+    bool  lastRaining;
     int   currentState;
 
 public:
@@ -26,18 +26,16 @@ public:
     static const Event RAIN_NORMAL_EVENT;
     static const Event RAIN_CRITICAL_EVENT;
 
-    /// Umbral de criticidad por porcentaje de lluvia (AO invertido).
-    static constexpr float RAIN_CRITICAL_PCT = 70.0f;
+    static constexpr float RAIN_CRITICAL_PCT = 50.0f;
 
-    /**
-     * @param aoPin  Pin ADC conectado a AO del FC-37.
-     * @param doPin  Pin conectado a DO del FC-37 (opcional; -1 para omitirlo).
-     */
     RainSensor(int aoPin, int doPin = -1, EventHandler* eventHandler = nullptr);
 
-    int   getLatestADC() const { return lastAO; }          ///< AO crudo (payload rain_adc).
-    float getLatestRainPct() const { return lastRainPct; } ///< % de lluvia (payload rain_pct).
-    bool  isRainingDigital() const { return lastRaining; } ///< Señal digital DO del módulo.
+    /// Configura los pines de entrada. Llamar desde setup()/begin(), no desde el constructor.
+    void begin();
+
+    int   getLatestADC() const { return lastAO; }
+    float getLatestRainPct() const { return lastRainPct; }
+    bool  isRainingDigital() const { return lastRaining; }
     void  update();
 };
 
